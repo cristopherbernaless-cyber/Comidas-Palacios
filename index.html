@@ -716,21 +716,66 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
       var user = result.user;
       var userDoc = await getDoc(doc(db, 'usuarios', user.uid));
       if(!userDoc.exists()) {
-        var refCode = genRefCode(user.displayName || 'USER');
-        await setDoc(doc(db, 'usuarios', user.uid), {
-          nombre: user.displayName || 'Cliente',
-          email: user.email,
-          codigoReferido: refCode,
-          descuentoAcumulado: 0,
-          referidosHechos: 0,
-          reservas: [],
-          creadoEn: new Date().toISOString()
-        });
+        // New user - show referral code modal before creating account
+        window.pendingGoogleUser = user;
+        closeAuthModal();
+        document.getElementById('google-ref-modal').style.display='flex';
+        document.getElementById('google-ref-name').textContent = user.displayName ? user.displayName.split(' ')[0] : 'Cliente';
+      } else {
+        // Existing user - just login
+        showToast('✅ ¡Bienvenido de vuelta ' + (user.displayName||'').split(' ')[0] + '!');
+        closeAuthModal();
       }
-      showToast('✅ ¡Bienvenido ' + (user.displayName||'') + '!');
-      closeAuthModal();
     } catch(e) {
       showToast('❌ Error al iniciar con Google');
+    }
+  };
+
+  // Complete Google registration with optional referral code
+  window.completeGoogleRegister = async function(refCodeUsado) {
+    var user = window.pendingGoogleUser;
+    if(!user) return;
+    try {
+      var refCode = genRefCode(user.displayName || 'USER');
+      var descuentoInicial = 0;
+      var refCodeValido = '';
+
+      if(refCodeUsado && refCodeUsado.trim() !== '') {
+        var refCodeUpper = refCodeUsado.trim().toUpperCase();
+        var usersRef = collection(db, 'usuarios');
+        var q = query(usersRef, where('codigoReferido', '==', refCodeUpper));
+        var snap = await getDocs(q);
+        if(!snap.empty) {
+          descuentoInicial = 5000;
+          refCodeValido = refCodeUpper;
+          var referrerDoc = snap.docs[0];
+          await updateDoc(doc(db, 'usuarios', referrerDoc.id), {
+            descuentoAcumulado: (referrerDoc.data().descuentoAcumulado || 0) + 5000,
+            referidosHechos: (referrerDoc.data().referidosHechos || 0) + 1
+          });
+          showToast('🎁 Código válido · ¡Tienes $5.000 de descuento!');
+        } else {
+          showToast('⚠️ Código inválido — cuenta creada sin descuento');
+        }
+      }
+
+      await setDoc(doc(db, 'usuarios', user.uid), {
+        nombre: user.displayName || 'Cliente',
+        email: user.email,
+        codigoReferido: refCode,
+        descuentoAcumulado: descuentoInicial,
+        referidosHechos: 0,
+        codigoUsado: refCodeValido,
+        reservas: [],
+        creadoEn: new Date().toISOString()
+      });
+
+      document.getElementById('google-ref-modal').style.display='none';
+      window.pendingGoogleUser = null;
+      if(descuentoInicial === 0) showToast('✅ ¡Bienvenido ' + (user.displayName||'').split(' ')[0] + '!');
+    } catch(e) {
+      showToast('❌ Error al completar el registro');
+      console.log(e);
     }
   };
 
@@ -1296,6 +1341,25 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
           <div class="order-total"><span>Total a Pagar:</span><span id="modal-total">$0</span></div>
         </div>
 
+        <!-- REFERRAL CODE AT PAYMENT -->
+        <div class="form-section" id="ref-payment-section">
+          <h3>🎁 Código de Referido</h3>
+          <div style="background:#fff8e1;border:1px solid #ffcc02;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:.8rem;color:#5f4c00;">
+            ¿Un amigo te compartió un código? Ingrésalo aquí y obtén <strong>$5.000 de descuento</strong> en este evento.<br>
+            <span style="font-size:.72rem;color:#7a6400;">⚠️ Debe ser tu primera reserva y válido durante este mes.</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="pay-ref-code" type="text" placeholder="PAL-XXXX-XXXX"
+              style="flex:1;border:2px solid #e0e0e0;border-radius:10px;padding:10px 14px;font-size:.9rem;outline:none;text-transform:uppercase;font-family:'Nunito',sans-serif;box-sizing:border-box;"
+              oninput="this.value=this.value.toUpperCase()">
+            <button onclick="applyPaymentRefCode()" 
+              style="padding:10px 16px;background:#E8970A;color:#fff;border:none;border-radius:10px;font-family:'Fredoka One',cursive;font-size:.9rem;cursor:pointer;white-space:nowrap;">
+              Aplicar
+            </button>
+          </div>
+          <div id="pay-ref-status" style="display:none;font-size:.78rem;padding:6px 10px;border-radius:8px;margin-top:8px;"></div>
+        </div>
+
         <div class="form-section">
           <h3>👤 Datos del Evento</h3>
           <div class="form-group">
@@ -1504,11 +1568,26 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
         <input class="auth-input" id="reg-name" type="text" placeholder="Nombre completo">
         <input class="auth-input" id="reg-email" type="email" placeholder="Correo electrónico">
         <input class="auth-input" id="reg-pass" type="password" placeholder="Contraseña (mín. 6 caracteres)">
-        <div style="position:relative;">
-          <input class="auth-input" id="reg-ref" type="text" placeholder="Código de referido (opcional)" style="text-transform:uppercase;padding-right:80px;" oninput="this.value=this.value.toUpperCase()">
-          <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:.72rem;background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:8px;font-weight:600;">🎁 $5.000</span>
+
+        <!-- REFERRAL SECTION -->
+        <div style="background:#fff8e1;border:1px solid #ffcc02;border-radius:10px;padding:12px 14px;">
+          <div style="font-size:.8rem;font-weight:700;color:#5f4c00;margin-bottom:8px;">🎁 ¿Tienes un código de referido?</div>
+          <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:10px;">
+            <div style="font-size:.73rem;color:#7a6400;">✅ Tú y tu amigo obtienen <strong>$5.000 de descuento</strong> cada uno</div>
+            <div style="font-size:.73rem;color:#7a6400;">📅 Válido solo durante <strong>junio 2026</strong> — debes pagar antes del 30 de junio</div>
+            <div style="font-size:.73rem;color:#7a6400;">📆 Puedes agendar tu evento para <strong>cualquier fecha del año</strong></div>
+            <div style="font-size:.73rem;color:#7a6400;">🎉 Aplica en tu <strong>primera reserva</strong> y es combinable con otras promos</div>
+          </div>
+          <div style="position:relative;">
+            <input class="auth-input" id="reg-ref" type="text" 
+              placeholder="Código de referido (ej: PAL-JUAN-A1B2)" 
+              style="text-transform:uppercase;padding-right:80px;margin:0;" 
+              oninput="this.value=this.value.toUpperCase()">
+            <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.7rem;background:#e8f5e9;color:#2e7d32;padding:2px 7px;border-radius:8px;font-weight:700;">$5.000</span>
+          </div>
         </div>
         <div id="ref-status" style="display:none;font-size:.78rem;padding:6px 10px;border-radius:8px;margin-top:-6px;"></div>
+
         <button class="auth-btn primary" onclick="doRegister()">Crear Cuenta</button>
         <div class="auth-divider">o</div>
         <button class="auth-btn google" onclick="fbGoogleLogin()">
@@ -1559,6 +1638,57 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
         <div id="up-reservas"><div style="color:#999;text-align:center;padding:12px;font-size:.85rem;">Cargando...</div></div>
       </div>
       <button onclick="fbLogout()" style="width:100%;padding:12px;background:#f44336;color:#fff;border:none;border-radius:12px;font-family:Fredoka One,cursive;font-size:1rem;cursor:pointer;margin-top:4px;">Cerrar Sesión</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- GOOGLE REFERRAL MODAL -->
+<div id="google-ref-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:600;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:20px;width:100%;max-width:400px;overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#3D1C00,#6B3500);padding:24px;text-align:center;">
+      <div style="font-size:2rem;">🎉</div>
+      <h2 style="font-family:'Fredoka One',cursive;color:#E8970A;font-size:1.3rem;margin-top:8px;">¡Bienvenido <span id="google-ref-name"></span>!</h2>
+      <p style="font-size:.82rem;color:#FEF0C4;margin-top:4px;">Cuenta creada con Google exitosamente</p>
+    </div>
+    <div style="padding:20px;">
+      <!-- GIFT BOX -->
+      <div style="background:linear-gradient(135deg,#1a0a00,#2d1200);border:2px solid #E8970A;border-radius:12px;padding:14px;margin-bottom:14px;text-align:center;">
+        <div style="font-size:1rem;font-weight:700;color:#E8970A;margin-bottom:6px;">🎁 ¿Un amigo te invitó a Comidas Palacios?</div>
+        <div style="font-size:.82rem;color:#FEF0C4;line-height:1.5;">Ingresa su código y <strong style="color:#E8970A;">ambos obtienen $5.000 de descuento</strong> en su próxima reserva</div>
+      </div>
+
+      <!-- CONDITIONS -->
+      <div style="background:#f8f9fa;border-radius:10px;padding:12px;margin-bottom:14px;">
+        <div style="font-size:.75rem;font-weight:700;color:#555;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">📋 Condiciones del descuento</div>
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <div style="font-size:.78rem;color:#444;">✅ <strong>$5.000 de descuento</strong> en tu primera reserva</div>
+          <div style="font-size:.78rem;color:#444;">📅 Válido solo durante <strong>junio 2026</strong> — debes pagar antes del 30 de junio</div>
+          <div style="font-size:.78rem;color:#444;">📆 Puedes agendar tu evento para <strong>cualquier fecha del año</strong></div>
+          <div style="font-size:.78rem;color:#444;">🎁 Combinable con la <strong>promo junio-diciembre</strong> (helados + palomitas)</div>
+          <div style="font-size:.78rem;color:#444;">🎉 Tu amigo también recibe <strong>$5.000</strong> acumulables en su próxima reserva</div>
+        </div>
+      </div>
+
+      <!-- INPUT -->
+      <div style="position:relative;margin-bottom:10px;">
+        <input id="google-ref-input" type="text" placeholder="Código de referido (ej: PAL-JUAN-A1B2)"
+          style="width:100%;border:2px solid #e0e0e0;border-radius:10px;padding:12px 16px;font-size:.9rem;outline:none;box-sizing:border-box;text-transform:uppercase;font-family:'Nunito',sans-serif;transition:.2s;"
+          oninput="this.value=this.value.toUpperCase()" 
+          onfocus="this.style.borderColor='#E8970A'"
+          onblur="this.style.borderColor='#e0e0e0'">
+        <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.7rem;background:#e8f5e9;color:#2e7d32;padding:2px 7px;border-radius:8px;font-weight:700;">$5.000</span>
+      </div>
+      <div id="google-ref-status" style="display:none;font-size:.78rem;padding:6px 10px;border-radius:8px;margin-bottom:10px;"></div>
+
+      <button onclick="completeGoogleRegister(document.getElementById('google-ref-input').value)"
+        style="width:100%;padding:13px;background:linear-gradient(135deg,#E8921A,#E8970A);color:#fff;border:none;border-radius:12px;font-family:'Fredoka One',cursive;font-size:1.05rem;cursor:pointer;margin-bottom:8px;transition:.2s;">
+        ✅ Confirmar y continuar
+      </button>
+      <button onclick="completeGoogleRegister('')"
+        style="width:100%;padding:10px;background:none;border:none;color:#aaa;font-size:.8rem;cursor:pointer;font-family:'Nunito',sans-serif;">
+        No tengo código — continuar sin descuento
+      </button>
     </div>
   </div>
 </div>
@@ -1869,6 +1999,7 @@ function updateBookingReady(){
 function openPaymentModal(){
   if(!selDate||selTime===null){ showToast('⚠️ Selecciona fecha y hora primero'); return; }
   buildModalOrder();
+  updateRefPaymentSection();
   document.getElementById('modal-overlay').classList.add('open');
   document.body.style.overflow='hidden';
   showStep('step-order');
@@ -1905,7 +2036,104 @@ function buildModalOrder(){
   html+='<div class="order-row"><span>⏰ Horario</span><span>'+String(selTime).padStart(2,'0')+':00 ('+pr.hours+' hrs)</span></div>';
   if(sc) html+='<div class="order-row" style="color:var(--red)"><span>⚠️ Recargo nocturno</span><span>+10%</span></div>';
   document.getElementById('modal-order-items').innerHTML=html;
-  // Apply referral discount if user has one
+  
+// Apply referral code at payment time
+window.applyPaymentRefCode = async function() {
+  var code = document.getElementById('pay-ref-code').value.trim().toUpperCase();
+  var statusEl = document.getElementById('pay-ref-status');
+  if(!code){ 
+    statusEl.style.display='block';
+    statusEl.style.background='#fff3cd';
+    statusEl.style.color='#856404';
+    statusEl.textContent='⚠️ Ingresa un código primero';
+    return; 
+  }
+
+  // Check if already has discount
+  if(window.userData && window.userData.descuentoAcumulado > 0){
+    statusEl.style.display='block';
+    statusEl.style.background='#e8f5e9';
+    statusEl.style.color='#2e7d32';
+    statusEl.textContent='✅ Ya tienes $' + window.userData.descuentoAcumulado.toLocaleString('es-CL') + ' de descuento aplicado';
+    return;
+  }
+
+  // Check if first reservation
+  if(window.userData && window.userData.reservas && window.userData.reservas.length > 0){
+    statusEl.style.display='block';
+    statusEl.style.background='#fff3cd';
+    statusEl.style.color='#856404';
+    statusEl.textContent='⚠️ El descuento por referido es solo válido en la primera reserva';
+    return;
+  }
+
+  // Check expiry (must be used within current month)
+  var now = new Date();
+  var lastDay = new Date(now.getFullYear(), now.getMonth()+1, 0);
+  var daysLeft = Math.ceil((lastDay - now) / (1000*60*60*24));
+
+  statusEl.style.display='block';
+  statusEl.style.background='#e3f2fd';
+  statusEl.style.color='#1565c0';
+  statusEl.textContent='🔍 Validando código...';
+
+  try {
+    var usersRef = collection(db, 'usuarios');
+    var q = query(usersRef, where('codigoReferido', '==', code));
+    var snap = await getDocs(q);
+    if(snap.empty){
+      statusEl.style.background='#fde8e8';
+      statusEl.style.color='#c62828';
+      statusEl.textContent='❌ Código inválido. Verifica que esté bien escrito';
+    } else {
+      var referrerDoc = snap.docs[0];
+      // Apply discount
+      if(window.currentUser){
+        await updateDoc(doc(db, 'usuarios', window.currentUser.uid), {
+          descuentoAcumulado: 5000,
+          codigoUsado: code
+        });
+        if(window.userData) window.userData.descuentoAcumulado = 5000;
+        // Add discount to referrer
+        await updateDoc(doc(db, 'usuarios', referrerDoc.id), {
+          descuentoAcumulado: (referrerDoc.data().descuentoAcumulado || 0) + 5000,
+          referidosHechos: (referrerDoc.data().referidosHechos || 0) + 1
+        });
+      }
+      // Update totals in modal
+      statusEl.style.background='#e8f5e9';
+      statusEl.style.color='#2e7d32';
+      statusEl.textContent='✅ ¡Código aplicado! Ahorras $5.000 · Válido hasta el ' + lastDay.getDate() + ' de este mes (' + daysLeft + ' días restantes)';
+      // Rebuild modal to show discount
+      buildModalOrder();
+      document.getElementById('pay-ref-code').disabled=true;
+      document.getElementById('pay-ref-code').style.background='#f0fdf4';
+    }
+  } catch(e) {
+    statusEl.style.background='#fde8e8';
+    statusEl.style.color='#c62828';
+    statusEl.textContent='❌ Error al validar. Intenta nuevamente';
+    console.log(e);
+  }
+};
+
+// Hide referral section if user already has discount or has reservations
+function updateRefPaymentSection(){
+  var section = document.getElementById('ref-payment-section');
+  if(!section) return;
+  var hasDiscount = window.userData && window.userData.descuentoAcumulado > 0;
+  var hasReservations = window.userData && window.userData.reservas && window.userData.reservas.length > 0;
+  // Hide if already has discount (will show in total) or has prior reservations
+  if(hasDiscount){
+    section.style.display='none'; // discount already shown in total
+  } else if(hasReservations){
+    section.style.display='none'; // not first reservation
+  } else {
+    section.style.display='block';
+  }
+}
+
+// Apply referral discount if user has one
   var descuento = (window.userData && window.userData.descuentoAcumulado) ? window.userData.descuentoAcumulado : 0;
   var totalConDescuento = Math.max(0, total - descuento);
   window.descuentoAplicado = descuento > 0 ? descuento : 0;
