@@ -619,7 +619,7 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
            signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup,
            sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
-  import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion }
+  import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, collection, query, where, getDocs }
            from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -651,20 +651,47 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
   });
 
   // Register
-  window.fbRegister = async function(email, password, name) {
+  window.fbRegister = async function(email, password, name, refCodeUsado) {
     try {
       var cred = await createUserWithEmailAndPassword(auth, email, password);
       var refCode = genRefCode(name);
+      var descuentoInicial = 0;
+      var refCodeValido = '';
+
+      // Validate referral code if provided
+      if(refCodeUsado && refCodeUsado.trim() !== '') {
+        var refCodeUpper = refCodeUsado.trim().toUpperCase();
+        // Search for user with this referral code
+        var usersRef = collection(db, 'usuarios');
+        var q = query(usersRef, where('codigoReferido', '==', refCodeUpper));
+        var snap = await getDocs(q);
+        if(!snap.empty) {
+          // Valid code found
+          descuentoInicial = 5000;
+          refCodeValido = refCodeUpper;
+          // Add $5000 to the referrer
+          var referrerDoc = snap.docs[0];
+          await updateDoc(doc(db, 'usuarios', referrerDoc.id), {
+            descuentoAcumulado: (referrerDoc.data().descuentoAcumulado || 0) + 5000,
+            referidosHechos: (referrerDoc.data().referidosHechos || 0) + 1
+          });
+          showToast('🎁 Código válido · ¡Tienes $5.000 de descuento!');
+        } else {
+          showToast('⚠️ Código de referido inválido — cuenta creada sin descuento');
+        }
+      }
+
       await setDoc(doc(db, 'usuarios', cred.user.uid), {
         nombre: name,
         email: email,
         codigoReferido: refCode,
-        descuentoAcumulado: 0,
+        descuentoAcumulado: descuentoInicial,
         referidosHechos: 0,
+        codigoUsado: refCodeValido,
         reservas: [],
         creadoEn: new Date().toISOString()
       });
-      showToast('✅ ¡Cuenta creada! Bienvenido ' + name);
+      if(descuentoInicial === 0) showToast('✅ ¡Cuenta creada! Bienvenido ' + name);
       closeAuthModal();
     } catch(e) {
       showToast('❌ ' + translateFirebaseError(e.code));
@@ -1477,7 +1504,11 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
         <input class="auth-input" id="reg-name" type="text" placeholder="Nombre completo">
         <input class="auth-input" id="reg-email" type="email" placeholder="Correo electrónico">
         <input class="auth-input" id="reg-pass" type="password" placeholder="Contraseña (mín. 6 caracteres)">
-        <input class="auth-input" id="reg-ref" type="text" placeholder="Código de referido (opcional)">
+        <div style="position:relative;">
+          <input class="auth-input" id="reg-ref" type="text" placeholder="Código de referido (opcional)" style="text-transform:uppercase;padding-right:80px;" oninput="this.value=this.value.toUpperCase()">
+          <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:.72rem;background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:8px;font-weight:600;">🎁 $5.000</span>
+        </div>
+        <div id="ref-status" style="display:none;font-size:.78rem;padding:6px 10px;border-radius:8px;margin-top:-6px;"></div>
         <button class="auth-btn primary" onclick="doRegister()">Crear Cuenta</button>
         <div class="auth-divider">o</div>
         <button class="auth-btn google" onclick="fbGoogleLogin()">
@@ -1874,9 +1905,26 @@ function buildModalOrder(){
   html+='<div class="order-row"><span>⏰ Horario</span><span>'+String(selTime).padStart(2,'0')+':00 ('+pr.hours+' hrs)</span></div>';
   if(sc) html+='<div class="order-row" style="color:var(--red)"><span>⚠️ Recargo nocturno</span><span>+10%</span></div>';
   document.getElementById('modal-order-items').innerHTML=html;
+  // Apply referral discount if user has one
+  var descuento = (window.userData && window.userData.descuentoAcumulado) ? window.userData.descuentoAcumulado : 0;
+  var totalConDescuento = Math.max(0, total - descuento);
+  window.descuentoAplicado = descuento > 0 ? descuento : 0;
+  window.totalFinal = totalConDescuento;
+
   document.getElementById('modal-total').textContent='$'+total.toLocaleString('es-CL');
-  document.getElementById('modal-total-2').textContent='$'+total.toLocaleString('es-CL');
-  document.getElementById('btn-pay-amount').textContent='$'+total.toLocaleString('es-CL');
+  document.getElementById('modal-total-2').textContent='$'+totalConDescuento.toLocaleString('es-CL');
+  document.getElementById('btn-pay-amount').textContent='$'+totalConDescuento.toLocaleString('es-CL');
+
+  // Show discount row if applicable
+  var discRow = document.getElementById('modal-discount-row');
+  if(discRow) {
+    if(descuento > 0) {
+      discRow.style.display='flex';
+      document.getElementById('modal-discount-amt').textContent='-$'+descuento.toLocaleString('es-CL');
+    } else {
+      discRow.style.display='none';
+    }
+  }
   // Show gift if eligible
   var now=new Date();
   var isJune=now.getMonth()===5;
@@ -1998,11 +2046,22 @@ function processPayment(){
         duracion: data.duracion,
         productos: data.products,
         total: data.total,
+        descuentoAplicado: window.descuentoAplicado || 0,
+        totalFinal: window.totalFinal || data.total,
         direccion: data.addr,
         horario: data.hora_inicio + ' - ' + data.hora_fin,
         regalo: data.regalo || '',
         creadoEn: new Date().toISOString()
       });
+      // Reset discount after use
+      if(window.descuentoAplicado > 0 && window.currentUser){
+        try {
+          await updateDoc(doc(db, 'usuarios', window.currentUser.uid), {
+            descuentoAcumulado: 0
+          });
+          if(window.userData) window.userData.descuentoAcumulado = 0;
+        } catch(e){ console.log('Error resetting discount:', e); }
+      }
     }
     showStep('step-success');
     document.getElementById('success-detail').innerHTML=
@@ -2347,8 +2406,9 @@ function doRegister(){
   var name=document.getElementById('reg-name').value.trim();
   var email=document.getElementById('reg-email').value.trim();
   var pass=document.getElementById('reg-pass').value;
+  var ref=document.getElementById('reg-ref').value.trim();
   if(!name||!email||!pass){ showToast('⚠️ Completa todos los campos'); return; }
-  fbRegister(email,pass,name);
+  fbRegister(email,pass,name,ref);
 }
 
 function doReset(){
