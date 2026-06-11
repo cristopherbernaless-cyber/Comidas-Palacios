@@ -843,6 +843,73 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
     } catch(e) { console.log('Error cargando panel:', e); }
   }
 
+  // Apply referral code at payment time (inside module to access Firestore)
+  window.applyPaymentRefCode = async function() {
+    var code = document.getElementById('pay-ref-code').value.trim().toUpperCase();
+    var statusEl = document.getElementById('pay-ref-status');
+    if(!code){
+      statusEl.style.display='block';
+      statusEl.style.background='#fff3cd';
+      statusEl.style.color='#856404';
+      statusEl.textContent='⚠️ Ingresa un código primero';
+      return;
+    }
+    if(window.userData && window.userData.descuentoAcumulado > 0){
+      statusEl.style.display='block';
+      statusEl.style.background='#e8f5e9';
+      statusEl.style.color='#2e7d32';
+      statusEl.textContent='✅ Ya tienes $' + window.userData.descuentoAcumulado.toLocaleString('es-CL') + ' de descuento aplicado';
+      return;
+    }
+    if(window.userData && window.userData.reservas && window.userData.reservas.length > 0){
+      statusEl.style.display='block';
+      statusEl.style.background='#fff3cd';
+      statusEl.style.color='#856404';
+      statusEl.textContent='⚠️ El descuento por referido es válido solo en la primera reserva';
+      return;
+    }
+    var now = new Date();
+    var lastDay = new Date(now.getFullYear(), now.getMonth()+1, 0);
+    var daysLeft = Math.ceil((lastDay - now) / (1000*60*60*24));
+    statusEl.style.display='block';
+    statusEl.style.background='#e3f2fd';
+    statusEl.style.color='#1565c0';
+    statusEl.textContent='🔍 Validando código...';
+    try {
+      var usersRef = collection(db, 'usuarios');
+      var q = query(usersRef, where('codigoReferido', '==', code));
+      var snap = await getDocs(q);
+      if(snap.empty){
+        statusEl.style.background='#fde8e8';
+        statusEl.style.color='#c62828';
+        statusEl.textContent='❌ Código inválido. Verifica que esté bien escrito';
+      } else {
+        var referrerDoc = snap.docs[0];
+        if(window.currentUser){
+          await updateDoc(doc(db, 'usuarios', window.currentUser.uid), {
+            descuentoAcumulado: 5000, codigoUsado: code
+          });
+          if(window.userData) window.userData.descuentoAcumulado = 5000;
+          await updateDoc(doc(db, 'usuarios', referrerDoc.id), {
+            descuentoAcumulado: (referrerDoc.data().descuentoAcumulado || 0) + 5000,
+            referidosHechos: (referrerDoc.data().referidosHechos || 0) + 1
+          });
+        }
+        statusEl.style.background='#e8f5e9';
+        statusEl.style.color='#2e7d32';
+        statusEl.textContent='✅ ¡Código aplicado! Ahorras $5.000 · Válido hasta el ' + lastDay.getDate() + ' de este mes (' + daysLeft + ' días restantes)';
+        buildModalOrder();
+        document.getElementById('pay-ref-code').disabled=true;
+        document.getElementById('pay-ref-code').style.background='#f0fdf4';
+      }
+    } catch(e) {
+      statusEl.style.background='#fde8e8';
+      statusEl.style.color='#c62828';
+      statusEl.textContent='❌ Error al validar. Intenta nuevamente';
+      console.log(e);
+    }
+  };
+
   function translateFirebaseError(code) {
     var msgs = {
       'auth/email-already-in-use': 'Este correo ya está registrado',
@@ -2037,86 +2104,6 @@ function buildModalOrder(){
   if(sc) html+='<div class="order-row" style="color:var(--red)"><span>⚠️ Recargo nocturno</span><span>+10%</span></div>';
   document.getElementById('modal-order-items').innerHTML=html;
   
-// Apply referral code at payment time
-window.applyPaymentRefCode = async function() {
-  var code = document.getElementById('pay-ref-code').value.trim().toUpperCase();
-  var statusEl = document.getElementById('pay-ref-status');
-  if(!code){ 
-    statusEl.style.display='block';
-    statusEl.style.background='#fff3cd';
-    statusEl.style.color='#856404';
-    statusEl.textContent='⚠️ Ingresa un código primero';
-    return; 
-  }
-
-  // Check if already has discount
-  if(window.userData && window.userData.descuentoAcumulado > 0){
-    statusEl.style.display='block';
-    statusEl.style.background='#e8f5e9';
-    statusEl.style.color='#2e7d32';
-    statusEl.textContent='✅ Ya tienes $' + window.userData.descuentoAcumulado.toLocaleString('es-CL') + ' de descuento aplicado';
-    return;
-  }
-
-  // Check if first reservation
-  if(window.userData && window.userData.reservas && window.userData.reservas.length > 0){
-    statusEl.style.display='block';
-    statusEl.style.background='#fff3cd';
-    statusEl.style.color='#856404';
-    statusEl.textContent='⚠️ El descuento por referido es solo válido en la primera reserva';
-    return;
-  }
-
-  // Check expiry (must be used within current month)
-  var now = new Date();
-  var lastDay = new Date(now.getFullYear(), now.getMonth()+1, 0);
-  var daysLeft = Math.ceil((lastDay - now) / (1000*60*60*24));
-
-  statusEl.style.display='block';
-  statusEl.style.background='#e3f2fd';
-  statusEl.style.color='#1565c0';
-  statusEl.textContent='🔍 Validando código...';
-
-  try {
-    var usersRef = collection(db, 'usuarios');
-    var q = query(usersRef, where('codigoReferido', '==', code));
-    var snap = await getDocs(q);
-    if(snap.empty){
-      statusEl.style.background='#fde8e8';
-      statusEl.style.color='#c62828';
-      statusEl.textContent='❌ Código inválido. Verifica que esté bien escrito';
-    } else {
-      var referrerDoc = snap.docs[0];
-      // Apply discount
-      if(window.currentUser){
-        await updateDoc(doc(db, 'usuarios', window.currentUser.uid), {
-          descuentoAcumulado: 5000,
-          codigoUsado: code
-        });
-        if(window.userData) window.userData.descuentoAcumulado = 5000;
-        // Add discount to referrer
-        await updateDoc(doc(db, 'usuarios', referrerDoc.id), {
-          descuentoAcumulado: (referrerDoc.data().descuentoAcumulado || 0) + 5000,
-          referidosHechos: (referrerDoc.data().referidosHechos || 0) + 1
-        });
-      }
-      // Update totals in modal
-      statusEl.style.background='#e8f5e9';
-      statusEl.style.color='#2e7d32';
-      statusEl.textContent='✅ ¡Código aplicado! Ahorras $5.000 · Válido hasta el ' + lastDay.getDate() + ' de este mes (' + daysLeft + ' días restantes)';
-      // Rebuild modal to show discount
-      buildModalOrder();
-      document.getElementById('pay-ref-code').disabled=true;
-      document.getElementById('pay-ref-code').style.background='#f0fdf4';
-    }
-  } catch(e) {
-    statusEl.style.background='#fde8e8';
-    statusEl.style.color='#c62828';
-    statusEl.textContent='❌ Error al validar. Intenta nuevamente';
-    console.log(e);
-  }
-};
-
 // Hide referral section if user already has discount or has reservations
 function updateRefPaymentSection(){
   var section = document.getElementById('ref-payment-section');
