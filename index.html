@@ -842,7 +842,7 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
             }).join('');
           }
         }
-        panel.style.display = 'flex';
+        // Panel loads data silently - only opens when user clicks the button
       }
     } catch(e) { console.log('Error cargando panel:', e); }
   }
@@ -2612,7 +2612,12 @@ function closeAuthModal(){
   var gm=document.getElementById('google-ref-modal');
   if(gm){gm.style.display='none';gm.style.pointerEvents='none';} document.getElementById('auth-overlay').classList.remove('open'); }
 function closeAuthOnBg(e){ if(e.target===document.getElementById('auth-overlay')) closeAuthModal(); }
-function closeUserPanelBg(e){ if(e.target===document.getElementById('user-panel')) var _up=document.getElementById('user-panel');if(_up){_up.style.display='none';_up.style.pointerEvents='none';} }
+function closeUserPanelBg(e){
+  if(e.target===document.getElementById('user-panel')){
+    var _up=document.getElementById('user-panel');
+    if(_up){_up.style.display='none';_up.style.pointerEvents='none';}
+  }
+}
 
 function switchAuthTab(tab){
   document.querySelectorAll('.auth-tab').forEach(function(t){t.classList.remove('active');});
