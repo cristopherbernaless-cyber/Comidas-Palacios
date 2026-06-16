@@ -114,8 +114,8 @@ section{max-width:1100px;margin:0 auto;padding:56px 20px;width:100%;box-sizing:b
 .btn-pay-now:disabled{opacity:.4;cursor:not-allowed;transform:none;}
 
 /* PAYMENT MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .3s;}
-.modal-overlay.open{opacity:1;pointer-events:all;}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:500;display:none;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .3s;}
+.modal-overlay.open{display:flex;opacity:1;pointer-events:all;}
 .modal{background:#fff;border-radius:24px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.3);transform:scale(0.9);transition:transform .35s cubic-bezier(0.34,1.56,0.64,1);}
 .modal-overlay.open .modal{transform:scale(1);}
 .modal-header{background:linear-gradient(135deg,var(--brown),var(--amber-dark));padding:22px 28px;border-radius:24px 24px 0 0;display:flex;align-items:center;gap:14px;}
@@ -435,8 +435,8 @@ footer{background:var(--brown-dark);color:var(--cream2);text-align:center;paddin
 }
 
 /* SHARE REVIEW MODAL */
-.share-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .3s;}
-.share-overlay.open{opacity:1;pointer-events:all;}
+.share-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;display:none;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .3s;}
+.share-overlay.open{display:flex;opacity:1;pointer-events:all;}
 .share-modal{background:#fff;border-radius:20px;max-width:480px;width:100%;box-shadow:0 16px 48px rgba(0,0,0,.25);overflow:hidden;transform:scale(.9);transition:transform .35s cubic-bezier(.34,1.56,.64,1);}
 .share-overlay.open .share-modal{transform:scale(1);}
 .share-modal-header{background:linear-gradient(135deg,var(--brown),var(--amber-dark));padding:22px 24px;color:#fff;text-align:center;}
@@ -551,8 +551,8 @@ footer{background:var(--brown-dark);color:var(--cream2);text-align:center;paddin
 
 
 /* AUTH MODAL */
-.auth-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .25s;}
-.auth-overlay.open{opacity:1;pointer-events:all;}
+.auth-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;display:none;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .25s;}
+.auth-overlay.open{display:flex;opacity:1;pointer-events:all;}
 .auth-modal{background:#fff;border-radius:20px;width:100%;max-width:420px;overflow:hidden;transform:scale(.9);transition:transform .3s cubic-bezier(.34,1.56,.64,1);max-height:90vh;overflow-y:auto;}
 .auth-overlay.open .auth-modal{transform:scale(1);}
 .auth-header{background:linear-gradient(135deg,var(--brown-dark),var(--brown));padding:24px;text-align:center;color:#fff;}
@@ -578,7 +578,7 @@ footer{background:var(--brown-dark);color:var(--cream2);text-align:center;paddin
 .auth-link span{color:var(--amber-dark);font-weight:700;}
 
 /* USER PANEL */
-.user-panel{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;display:none;align-items:center;justify-content:center;padding:20px;}
+.user-panel{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;display:none;pointer-events:none;align-items:center;justify-content:center;padding:20px;}
 .user-modal{background:#fff;border-radius:20px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto;}
 .user-modal-header{background:linear-gradient(135deg,var(--brown-dark),var(--brown));padding:20px 24px;display:flex;align-items:center;gap:14px;}
 .user-avatar{width:50px;height:50px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-family:'Fredoka One',cursive;font-size:1.4rem;color:var(--brown-dark);flex-shrink:0;}
@@ -719,7 +719,9 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
         // New user - show referral code modal before creating account
         window.pendingGoogleUser = user;
         closeAuthModal();
-        document.getElementById('google-ref-modal').style.display='flex';
+        var gm2=document.getElementById('google-ref-modal');
+        gm2.style.display='flex';
+        gm2.style.pointerEvents='all';
         document.getElementById('google-ref-name').textContent = user.displayName ? user.displayName.split(' ')[0] : 'Cliente';
       } else {
         // Existing user - just login
@@ -770,7 +772,9 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
         creadoEn: new Date().toISOString()
       });
 
-      document.getElementById('google-ref-modal').style.display='none';
+      var gm=document.getElementById('google-ref-modal');
+        gm.style.display='none';
+        gm.style.pointerEvents='none';
       window.pendingGoogleUser = null;
       if(descuentoInicial === 0) showToast('✅ ¡Bienvenido ' + (user.displayName||'').split(' ')[0] + '!');
     } catch(e) {
@@ -783,7 +787,7 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
   window.fbLogout = async function() {
     await signOut(auth);
     showToast('👋 Sesión cerrada');
-    document.getElementById('user-panel').style.display='none';
+    var _up=document.getElementById('user-panel');if(_up){_up.style.display='none';_up.style.pointerEvents='none';}
   };
 
   // Reset password
@@ -927,7 +931,7 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
     var btnLogin = document.getElementById('btn-auth-header');
     if(btnLogin) {
       btnLogin.textContent = user ? '👤 ' + (user.displayName||user.email).split(' ')[0] : '🔐 Iniciar sesión';
-      btnLogin.onclick = user ? function(){ loadUserPanel(user); document.getElementById('user-panel').style.display='flex'; } : openAuthModal;
+      btnLogin.onclick = user ? function(){ loadUserPanel(user); var up=document.getElementById('user-panel');up.style.display='flex';up.style.pointerEvents='all'; } : openAuthModal;
     }
     // Show/hide booking notices
     var userNotice = document.getElementById('user-login-notice');
@@ -1711,8 +1715,8 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
 
 
 <!-- GOOGLE REFERRAL MODAL -->
-<div id="google-ref-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:600;align-items:center;justify-content:center;padding:20px;">
-  <div style="background:#fff;border-radius:20px;width:100%;max-width:400px;overflow:hidden;">
+<div id="google-ref-modal" style="display:none;pointer-events:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:600;align-items:center;justify-content:center;padding:20px;" onclick="completeGoogleRegister('')">
+  <div style="background:#fff;border-radius:20px;width:100%;max-width:400px;overflow:hidden;" onclick="event.stopPropagation()">
     <div style="background:linear-gradient(135deg,#3D1C00,#6B3500);padding:24px;text-align:center;">
       <div style="font-size:2rem;">🎉</div>
       <h2 style="font-family:'Fredoka One',cursive;color:#E8970A;font-size:1.3rem;margin-top:8px;">¡Bienvenido <span id="google-ref-name"></span>!</h2>
@@ -2066,8 +2070,17 @@ function updateBookingReady(){
 function openPaymentModal(){
   if(!selDate||selTime===null){ showToast('⚠️ Selecciona fecha y hora primero'); return; }
   buildModalOrder();
-  updateRefPaymentSection();
-  document.getElementById('modal-overlay').classList.add('open');
+  // Inline referral section visibility (no external function dependency)
+  var _refSection = document.getElementById('ref-payment-section');
+  if(_refSection){
+    var _hasDiscount = window.userData && window.userData.descuentoAcumulado > 0;
+    var _hasReservations = window.userData && window.userData.reservas && window.userData.reservas.length > 0;
+    _refSection.style.display = (_hasDiscount || _hasReservations) ? 'none' : 'block';
+  }
+  var mo = document.getElementById('modal-overlay');
+  mo.style.display = '';
+  mo.style.pointerEvents = '';
+  mo.classList.add('open');
   document.body.style.overflow='hidden';
   showStep('step-order');
   // Pre-fill form with logged-in user data
@@ -2093,6 +2106,8 @@ function showStep(id){
   if(target){ target.style.display='block'; target.classList&&target.classList.add('show'); }
 }
 
+
+
 function buildModalOrder(){
   var pi=activePromo, pr=PROMOS[pi];
   var total=getFinalTotal();
@@ -2105,20 +2120,7 @@ function buildModalOrder(){
   document.getElementById('modal-order-items').innerHTML=html;
   
 // Hide referral section if user already has discount or has reservations
-function updateRefPaymentSection(){
-  var section = document.getElementById('ref-payment-section');
-  if(!section) return;
-  var hasDiscount = window.userData && window.userData.descuentoAcumulado > 0;
-  var hasReservations = window.userData && window.userData.reservas && window.userData.reservas.length > 0;
-  // Hide if already has discount (will show in total) or has prior reservations
-  if(hasDiscount){
-    section.style.display='none'; // discount already shown in total
-  } else if(hasReservations){
-    section.style.display='none'; // not first reservation
-  } else {
-    section.style.display='block';
-  }
-}
+
 
 // Apply referral discount if user has one
   var descuento = (window.userData && window.userData.descuentoAcumulado) ? window.userData.descuentoAcumulado : 0;
@@ -2597,10 +2599,20 @@ function trackGiftPromo(pi){
 
 
 // AUTH FUNCTIONS
-function openAuthModal(){ document.getElementById('auth-overlay').classList.add('open'); }
-function closeAuthModal(){ document.getElementById('auth-overlay').classList.remove('open'); }
+function openAuthModal(){
+  var ao = document.getElementById('auth-overlay');
+  ao.style.display = '';
+  ao.style.pointerEvents = '';
+  ao.classList.add('open');
+}
+function closeAuthModal(){
+  var ao = document.getElementById('auth-overlay');
+  if(ao){ ao.classList.remove('open'); ao.style.display=''; ao.style.pointerEvents=''; }
+  // Safety: hide google-ref-modal too
+  var gm=document.getElementById('google-ref-modal');
+  if(gm){gm.style.display='none';gm.style.pointerEvents='none';} document.getElementById('auth-overlay').classList.remove('open'); }
 function closeAuthOnBg(e){ if(e.target===document.getElementById('auth-overlay')) closeAuthModal(); }
-function closeUserPanelBg(e){ if(e.target===document.getElementById('user-panel')) document.getElementById('user-panel').style.display='none'; }
+function closeUserPanelBg(e){ if(e.target===document.getElementById('user-panel')) var _up=document.getElementById('user-panel');if(_up){_up.style.display='none';_up.style.pointerEvents='none';} }
 
 function switchAuthTab(tab){
   document.querySelectorAll('.auth-tab').forEach(function(t){t.classList.remove('active');});
@@ -2640,5 +2652,46 @@ function copyRefCode(){
 // INIT
 buildGrids(); renderCal(); buildFAQ(); renderReviews();
 </script>
+
+// Global escape key to close any stuck modal
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape'){
+    var gm = document.getElementById('google-ref-modal');
+    if(gm && gm.style.display !== 'none'){ completeGoogleRegister(''); }
+    closeAuthModal();
+    closeModal();
+  }
+});
+// Safety: if page loads and google-ref-modal is somehow visible, hide it
+window.addEventListener('load', function(){
+  var gm = document.getElementById('google-ref-modal');
+  if(gm){ gm.style.display='none'; gm.style.pointerEvents='none'; }
+});
+
+<script>
+// Safety: reset all overlays on page load
+window.addEventListener('load', function(){
+  // Only reset non-CSS-class overlays with inline styles
+  ['google-ref-modal','user-panel'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el){ el.style.display='none'; el.style.pointerEvents='none'; }
+  });
+  // For CSS-class overlays, just remove the class and clear inline styles
+  ['modal-overlay','auth-overlay'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el){ el.classList.remove('open'); el.style.display=''; el.style.pointerEvents=''; }
+  });
+  document.body.style.overflow='';
+});
+
+// Double safety: click anywhere 5 times rapidly to reset overlays (debug helper)
+var _clickCount = 0, _clickTimer;
+document.addEventListener('click', function(){
+  _clickCount++;
+  clearTimeout(_clickTimer);
+  _clickTimer = setTimeout(function(){ _clickCount = 0; }, 500);
+});
+</script>
+
 </body>
 </html>
