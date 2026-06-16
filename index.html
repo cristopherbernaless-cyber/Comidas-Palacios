@@ -1409,7 +1409,25 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
         <div class="order-card">
           <h3>📋 Tu Pedido</h3>
           <div id="modal-order-items"></div>
-          <div class="order-total"><span>Total a Pagar:</span><span id="modal-total">$0</span></div>
+          <div class="order-total"><span>Subtotal:</span><span id="modal-total">$0</span></div>
+        </div>
+
+        <!-- DESCUENTO POR REFERIDO - visible y destacado -->
+        <div id="modal-discount-row" style="display:none;background:linear-gradient(135deg,#e8f5e9,#f1f8e9);border:2px solid #4caf50;border-radius:12px;padding:14px 16px;margin:8px 0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:.9rem;color:#1e7e34;font-weight:700;">🎁 Descuento por referido</div>
+              <div style="font-size:.75rem;color:#388e3c;margin-top:2px;">Aplicado automaticamente a tu reserva</div>
+            </div>
+            <div id="modal-discount-amt" style="font-size:1.1rem;color:#1e7e34;font-weight:800;">-$0</div>
+          </div>
+        </div>
+
+        <!-- TOTAL FINAL -->
+        <div class="order-card" style="margin-top:8px;">
+          <div class="order-total" style="border-top:none;padding-top:0;margin-top:0;">
+            <span>💰 Total a Pagar:</span><span id="modal-total-final" style="color:#1e7e34;font-size:1.1rem;">$0</span>
+          </div>
         </div>
 
         <!-- REFERRAL CODE AT PAYMENT -->
@@ -2070,12 +2088,14 @@ function updateBookingReady(){
 function openPaymentModal(){
   if(!selDate||selTime===null){ showToast('⚠️ Selecciona fecha y hora primero'); return; }
   buildModalOrder();
-  // Inline referral section visibility (no external function dependency)
+  // Show referral code field only if: logged in, no discount yet, first reservation
   var _refSection = document.getElementById('ref-payment-section');
   if(_refSection){
     var _hasDiscount = window.userData && window.userData.descuentoAcumulado > 0;
     var _hasReservations = window.userData && window.userData.reservas && window.userData.reservas.length > 0;
-    _refSection.style.display = (_hasDiscount || _hasReservations) ? 'none' : 'block';
+    var _isLoggedIn = window.currentUser ? true : false;
+    // Hide if already has discount (shown in green box above) or not first reservation
+    _refSection.style.display = (_hasDiscount || _hasReservations || !_isLoggedIn) ? 'none' : 'block';
   }
   var mo = document.getElementById('modal-overlay');
   mo.style.display = '';
@@ -2123,7 +2143,11 @@ function buildModalOrder(){
 
 
 // Apply referral discount if user has one
-  var descuento = (window.userData && window.userData.descuentoAcumulado) ? window.userData.descuentoAcumulado : 0;
+  // Force refresh userData from Firebase before showing discount
+  var descuento = 0;
+  if(window.userData && window.userData.descuentoAcumulado && window.userData.descuentoAcumulado > 0){
+    descuento = window.userData.descuentoAcumulado;
+  }
   var totalConDescuento = Math.max(0, total - descuento);
   window.descuentoAplicado = descuento > 0 ? descuento : 0;
   window.totalFinal = totalConDescuento;
@@ -2131,6 +2155,8 @@ function buildModalOrder(){
   document.getElementById('modal-total').textContent='$'+total.toLocaleString('es-CL');
   document.getElementById('modal-total-2').textContent='$'+totalConDescuento.toLocaleString('es-CL');
   document.getElementById('btn-pay-amount').textContent='$'+totalConDescuento.toLocaleString('es-CL');
+  var finalEl = document.getElementById('modal-total-final');
+  if(finalEl) finalEl.textContent='$'+totalConDescuento.toLocaleString('es-CL');
 
   // Show discount row if applicable
   var discRow = document.getElementById('modal-discount-row');
