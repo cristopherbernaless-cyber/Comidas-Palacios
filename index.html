@@ -1689,13 +1689,13 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
         <h3 id="up-name">Usuario</h3>
         <p id="up-email"></p>
       </div>
-      <button onclick="document.getElementById('user-panel').style.display=\'none\'" style="margin-left:auto;background:none;border:none;color:var(--cream2);font-size:1.3rem;cursor:pointer;">✕</button>
+      <button onclick="closeUserPanel()" style="margin-left:auto;background:none;border:none;color:var(--cream2);font-size:1.3rem;cursor:pointer;">✕</button>
     </div>
     <div class="user-body">
       <div class="user-section">
         <h4>🎁 Tu código de referido</h4>
         <div class="ref-code-box" id="up-code" onclick="copyRefCode()" title="Toca para copiar">PAL-XXXX-XXXX</div>
-        <p style="font-size:.75rem;color:#888;text-align:center;margin-top:6px;">Comparte este código · Tu amigo obtiene $3.000 off y tú acumulas $3.000</p>
+        <p style="font-size:.75rem;color:#888;text-align:center;margin-top:6px;">Comparte este código · Tu amigo obtiene $5.000 off y tú acumulas $5.000</p>
       </div>
       <div class="user-section">
         <h4>📊 Tus estadísticas</h4>
@@ -2612,11 +2612,13 @@ function closeAuthModal(){
   var gm=document.getElementById('google-ref-modal');
   if(gm){gm.style.display='none';gm.style.pointerEvents='none';} document.getElementById('auth-overlay').classList.remove('open'); }
 function closeAuthOnBg(e){ if(e.target===document.getElementById('auth-overlay')) closeAuthModal(); }
+
+function closeUserPanel(){
+  var up = document.getElementById('user-panel');
+  if(up){ up.style.display='none'; up.style.pointerEvents='none'; }
+}
 function closeUserPanelBg(e){
-  if(e.target===document.getElementById('user-panel')){
-    var _up=document.getElementById('user-panel');
-    if(_up){_up.style.display='none';_up.style.pointerEvents='none';}
-  }
+  if(e.target===document.getElementById('user-panel')){ closeUserPanel(); }
 }
 
 function switchAuthTab(tab){
