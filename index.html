@@ -2229,7 +2229,8 @@ function buildOrderText(){
     hora_inicio:String(selTime).padStart(2,'0')+':00', hora_fin:endLabel,
     recargo:sc?'Si — 10% por servicio nocturno (00:00–08:00)':'No',
     regalo:giftMsg,
-    total:'$'+total.toLocaleString('es-CL'), products:products };
+    descuento: window.descuentoAplicado||0,
+    total:'$'+Math.max(0, total-(window.descuentoAplicado||0)).toLocaleString('es-CL'), products:products };
 }
 
 async function sendEmailNotifications(data){
