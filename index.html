@@ -613,6 +613,24 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
 /></noscript>
 <!-- End Meta Pixel Code -->
 
+<!-- Google Analytics 4 -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-Z6YWTN1BEQ"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-Z6YWTN1BEQ');
+
+  // Helper global para enviar eventos personalizados desde cualquier parte de la pagina
+  window.trackEvent = function(eventName, params){
+    try {
+      gtag('event', eventName, params || {});
+      console.log('GA4 event:', eventName, params || {});
+    } catch(e) { console.log('GA4 error:', e); }
+  };
+</script>
+<!-- End Google Analytics 4 -->
+
 <!-- Firebase SDK -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
@@ -669,13 +687,10 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
           // Valid code found
           descuentoInicial = 5000;
           refCodeValido = refCodeUpper;
-          // Add $5000 to the referrer
-          var referrerDoc = snap.docs[0];
-          await updateDoc(doc(db, 'usuarios', referrerDoc.id), {
-            descuentoAcumulado: (referrerDoc.data().descuentoAcumulado || 0) + 5000,
-            referidosHechos: (referrerDoc.data().referidosHechos || 0) + 1
-          });
+          // Store referrer UID - will credit them ONLY after new user pays
+          window.pendingReferrerUid = snap.docs[0].id;
           showToast('🎁 Código válido · ¡Tienes $5.000 de descuento!');
+          if(window.trackEvent) window.trackEvent('codigo_referido_aplicado', {momento:'registro'});
         } else {
           showToast('⚠️ Código de referido inválido — cuenta creada sin descuento');
         }
@@ -688,10 +703,12 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
         descuentoAcumulado: descuentoInicial,
         referidosHechos: 0,
         codigoUsado: refCodeValido,
+        referidorUid: window.pendingReferrerUid || '',
         reservas: [],
         creadoEn: new Date().toISOString()
       });
       if(descuentoInicial === 0) showToast('✅ ¡Cuenta creada! Bienvenido ' + name);
+      if(window.trackEvent) window.trackEvent('registro_completado', {metodo:'email', tiene_referido: descuentoInicial>0});
       closeAuthModal();
     } catch(e) {
       showToast('❌ ' + translateFirebaseError(e.code));
@@ -750,12 +767,10 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
         if(!snap.empty) {
           descuentoInicial = 5000;
           refCodeValido = refCodeUpper;
-          var referrerDoc = snap.docs[0];
-          await updateDoc(doc(db, 'usuarios', referrerDoc.id), {
-            descuentoAcumulado: (referrerDoc.data().descuentoAcumulado || 0) + 5000,
-            referidosHechos: (referrerDoc.data().referidosHechos || 0) + 1
-          });
+          // Store referrer UID - credit them ONLY after new user pays
+          window.pendingReferrerUid = snap.docs[0].id;
           showToast('🎁 Código válido · ¡Tienes $5.000 de descuento!');
+          if(window.trackEvent) window.trackEvent('codigo_referido_aplicado', {momento:'registro'});
         } else {
           showToast('⚠️ Código inválido — cuenta creada sin descuento');
         }
@@ -768,6 +783,7 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
         descuentoAcumulado: descuentoInicial,
         referidosHechos: 0,
         codigoUsado: refCodeValido,
+        referidorUid: window.pendingReferrerUid || '',
         reservas: [],
         creadoEn: new Date().toISOString()
       });
@@ -776,6 +792,7 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
         gm.style.display='none';
         gm.style.pointerEvents='none';
       window.pendingGoogleUser = null;
+      if(window.trackEvent) window.trackEvent('registro_completado', {metodo:'google', tiene_referido: descuentoInicial>0});
       if(descuentoInicial === 0) showToast('✅ ¡Bienvenido ' + (user.displayName||'').split(' ')[0] + '!');
     } catch(e) {
       showToast('❌ Error al completar el registro');
@@ -894,14 +911,13 @@ src="https://www.facebook.com/tr?id=1683320512705701&ev=PageView&noscript=1"
             descuentoAcumulado: 5000, codigoUsado: code
           });
           if(window.userData) window.userData.descuentoAcumulado = 5000;
-          await updateDoc(doc(db, 'usuarios', referrerDoc.id), {
-            descuentoAcumulado: (referrerDoc.data().descuentoAcumulado || 0) + 5000,
-            referidosHechos: (referrerDoc.data().referidosHechos || 0) + 1
-          });
+          // Store referrer UID - credit after payment
+          window.pendingReferrerUid = referrerDoc.id;
         }
         statusEl.style.background='#e8f5e9';
         statusEl.style.color='#2e7d32';
         statusEl.textContent='✅ ¡Código aplicado! Ahorras $5.000 · Válido hasta el ' + lastDay.getDate() + ' de este mes (' + daysLeft + ' días restantes)';
+        if(window.trackEvent) window.trackEvent('codigo_referido_aplicado', {momento:'pago'});
         buildModalOrder();
         document.getElementById('pay-ref-code').disabled=true;
         document.getElementById('pay-ref-code').style.background='#f0fdf4';
@@ -2088,6 +2104,7 @@ function updateBookingReady(){
 function openPaymentModal(){
   if(!selDate||selTime===null){ showToast('⚠️ Selecciona fecha y hora primero'); return; }
   buildModalOrder();
+  if(window.trackEvent) window.trackEvent('reserva_iniciada', {});
   // Show referral code field only if: logged in, no discount yet, first reservation
   var _refSection = document.getElementById('ref-payment-section');
   if(_refSection){
@@ -2297,17 +2314,41 @@ function processPayment(){
         regalo: data.regalo || '',
         creadoEn: new Date().toISOString()
       });
-      // Reset discount after use
+      // Reset discount after use AND credit the referrer
       if(window.descuentoAplicado > 0 && window.currentUser){
         try {
+          // Get referrerUid from userData or window
+          var referrerUid = (window.userData && window.userData.referidorUid) ? window.userData.referidorUid : (window.pendingReferrerUid || '');
+          
+          // Credit the referrer $5000 now that payment is confirmed
+          if(referrerUid) {
+            var referrerRef = doc(db, 'usuarios', referrerUid);
+            var referrerSnap = await getDoc(referrerRef);
+            if(referrerSnap.exists()) {
+              await updateDoc(referrerRef, {
+                descuentoAcumulado: (referrerSnap.data().descuentoAcumulado || 0) + 5000,
+                referidosHechos: (referrerSnap.data().referidosHechos || 0) + 1
+              });
+            }
+          }
+          
+          // Reset new user discount to 0
           await updateDoc(doc(db, 'usuarios', window.currentUser.uid), {
             descuentoAcumulado: 0
           });
           if(window.userData) window.userData.descuentoAcumulado = 0;
-        } catch(e){ console.log('Error resetting discount:', e); }
+          window.pendingReferrerUid = null;
+        } catch(e){ console.log('Error processing referral:', e); }
       }
     }
     showStep('step-success');
+    if(window.trackEvent) window.trackEvent('pago_completado', {
+      order_id: data.orderId,
+      valor: parseInt((data.total||'0').replace(/[^0-9]/g,'')) || 0,
+      promo: data.promo,
+      tiene_descuento: (data.descuento||0) > 0,
+      currency: 'CLP'
+    });
     document.getElementById('success-detail').innerHTML=
       '📋 <strong>N° Pedido: '+data.orderId+'</strong><br>'+
       '🎉 '+data.promo+' · '+data.duracion+'<br>'+
